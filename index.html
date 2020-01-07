@@ -1,0 +1,468 @@
+<!DOCTYPE>
+
+<html>
+
+  <head>
+    <title>退火演算法解旅行者問題 demo</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1, maximum-scale=1">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.1/css/bootstrap.min.css" integrity="sha384-WskhaSGFgHYWDcbwN70/dfYBj47jz9qbsMId/iRN3ewGhXQFZCSftd1LZCfmhktB" crossorigin="anonymous">
+    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.3/umd/popper.min.js" integrity="sha384-ZMP7rVo3mIykV+2+9J3UJ46jBk0WLaUAdn689aCwoqbBJiSnjAK/l8WvCWPIPm49" crossorigin="anonymous"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.1/js/bootstrap.min.js" integrity="sha384-smHYKdLADwkXOn1EmN1qk/HfnUcbVRZyYmZ4qpPea6sjB/pTJ0euyQp0Mk8ck+5T" crossorigin="anonymous"></script>
+
+
+    <script src="js/jquery-3.4.1.min.js"></script>
+    <script>
+        $.fn.getFormObject = function() {
+            var obj = {};
+            var arr = this.serializeArray();
+            arr.forEach(function(item, index) {
+                if (obj[item.name] === undefined) { // New
+                    obj[item.name] = item.value || '';
+                } else {                            // Existing
+                    if (!obj[item.name].push) {
+                        obj[item.name] = [obj[item.name]];
+                    }
+                    obj[item.name].push(item.value || '');
+                }
+            });
+            return obj;
+        };
+    </script>
+    <script src="js/cytoscape.min.js"></script>
+
+    <!-- for testing with local version of cytoscape.js -->
+    <!--<script src="../cytoscape.js/build/cytoscape.js"></script>-->
+
+    <script src="js/lodash.js"></script>
+    <script src="js/cytoscape-edgehandles.js"></script>
+
+    <script src="js/popper.js"></script>
+	<script src="js/cytoscape-popper.js"></script>
+
+    <style>
+        #cy {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            right: 0;
+        }
+
+        h1 {
+            opacity: 0.5;
+            font-size: 1em;
+            font-weight: bold;
+        }
+
+        .popper-div { /* just an example */
+            border: 5px solid rgb(153, 153, 153);
+            border-radius:100%;
+            background: #fff;
+            z-index: 9999;
+            padding: 0.25em;
+            pointer-events: none;
+        }
+    </style>
+  </head>
+
+  <body>
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-5 pt-5">
+                <div class="card">
+                    <div class="card-header">
+                        數值設定
+                    </div>
+                    <div class="card-body">
+                        <form id="basicSet">
+                            <div class="form-group row">
+                              <label for="colFormLabelLg" class="col-sm-2 col-form-label col-form-label-lg">規模(n)</label>
+                              <div class="col-sm-10">
+                                <input name="sN" type="number" class="form-control form-control-lg" value="4">
+                              </div>
+                            </div>
+                            <div class="form-group row">
+                                <label for="colFormLabelLg" class="col-sm-2 col-form-label col-form-label-lg">初始溫度(T)</label>
+                                <div class="col-sm-10">
+                                  <input name="sT" type="number" class="form-control form-control-lg" value="20">
+                                </div>
+                            </div>
+                            <div class="form-group row">
+                                <label for="colFormLabelLg" class="col-sm-2 col-form-label col-form-label-lg">迭代次數(L)</label>
+                                <div class="col-sm-10">
+                                  <input name="sL" type="number" class="form-control form-control-lg" value="100">
+                                </div>
+                            </div>
+                            <div class="form-group row">
+                                <label for="colFormLabelLg" class="col-sm-2 col-form-label col-form-label-lg">降溫常數(λ)</label>
+                                <div class="col-sm-10">
+                                  <input name="sl" type="number" class="form-control form-control-lg" value="0.95">
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-outline-primary mr-2" onclick="basic.updateSet()">初始化</button>
+                            <button type="button" class="btn btn-outline-info" onclick="basic.updatePartSet()">更新部分設定（不更動規模）</button>
+                        </form>
+                    </div>        
+                </div>
+                
+                <div class="card mt-3">
+                    <div class="card-header">
+                        權重設定
+                    </div>
+                    <div class="card-body">
+                        <div id="weightArea">
+                            
+                        </div>
+                        <div class="form-check-inline">
+                            <button type="button" class="btn btn-outline-primary" onclick="weights.setWeights()">更新權重數值</button>
+                            <button type="button" class="btn btn-outline-info ml-3" onclick="weights.random()">亂數權重</button>
+                            <input id="rMin" type="number" class="form-control form-control-xs ml-3 mr-3" 
+                            min="1"
+                            value="1">
+                            to
+                            <input id="rMax" type="number" class="form-control form-control-xs  ml-3 mr-3"
+                            max="100"
+                            value="100">
+                        </div>
+                    </div>        
+                </div> 
+
+                <div class="card mt-3">
+                    <div class="card-header">
+                        解
+                    </div>
+                    <div class="card-body">
+                        <div class="col-12">
+                            <h5>目前數值設定</h5>
+                            <h6 id="ansSetArea"></h6>
+                        </div>
+
+                        <button type="button" class="btn btn-outline-success" onclick="answer.getAns()">求解</button>
+                        <div id="ansArea" class="col-12 mt-3">
+                            
+                        </div>
+                    </div>       
+                </div> 
+            </div>
+            
+            <div class="col-7" id="cy"></div>
+        </div>
+    </div>
+  </body>
+
+    <script>
+        var basic = {
+            form : $("#basicSet"),
+            _n : 5,
+            _T : 20,
+            _L : 100,
+            _l : 0.95,
+            updateSet : function(){
+                var val = this.form.getFormObject();
+                this._n = parseInt(val.sN);
+                this._T = parseInt(val.sT);
+                this._L = parseInt(val.sL);
+                this._l = parseFloat(val.sl);
+                weights.newWeights();
+                graphics.setNodes(this._n);
+                this.setInfo();
+            },
+            updatePartSet : function(){
+                var val = this.form.getFormObject();
+                this._T = parseInt(val.sT);
+                this._L = parseInt(val.sL);
+                this._l = parseFloat(val.sl);
+                this.setInfo();
+            },
+            setInfo : function(){
+                answer.updateInfo(this._T,this._L,this._l);
+            }
+        }
+
+        var weights = {
+            area : $("#weightArea"),
+            rMin : $("#rMin"),
+            rMax : $("#rMax"),
+            weiData : [],
+            newWeights : function () {
+                var html = "";
+                for (var i = 0; i < basic._n; i++) {
+                    html += `<form id="col-${i}" class="col-12 form-check-inline mt-3">`;
+                    html += `<text class="mr-2">${i}:</text>`;
+                    html += this.getInputs(basic._n,i);
+                    html += `</form>`;
+                }
+                this.area.html(html);
+            },
+            getInputs : function(n,now){
+                var inputs = "";
+                for (var j = 0; j < n; j++) {
+                    if((j)!=now){
+                        inputs += `
+                            <input class="form-control form-control-sm" name="data" type="text" placeholder="${now}to${j}">
+                        `;
+                    }
+                }
+                return inputs;
+            },
+            random : function(){
+                for (var i = 0; i < basic._n; i++) {
+                    var dom = $(`#col-${i} input[name='data']`);
+                    this.setRandom(dom);
+                }
+            },
+            setRandom : function(dom){
+                for(var j = 0; j<dom.length;j++){
+                    $(dom[j]).val(this.getRandom(
+                        parseInt(this.rMin.val()),
+                        parseInt(this.rMax.val())
+                    ));
+                }
+            },
+            getRandom : function (min,max){
+                return Math.floor(Math.random()*(max-min+1))+min;
+            },
+            setWeights : function(){
+                this.weiData = [];
+                for(var i = 0; i<basic._n ; i++){
+                    this.weiData.push(this.getColData(i));
+                }
+                graphics.setPopper(this.weiData);
+            },
+            getColData : function(now){
+                var data = $(`#col-${now}`).getFormObject().data;
+                for(var j=0; j<data.length ; j++){
+                    data[j] = parseInt(data[j]);
+                }
+                data.splice(now,0,0);
+                return data;
+            }
+        }
+
+        var graphics = {
+            container : $("#cy"),
+            cy : {} ,
+            setNodes : function(n){
+                this.cy.destroy();
+                this.init();
+                var data = [];
+                for(var i = 0; i<n; i++){
+                    data.push({
+                        group: 'nodes',
+                        data: { 
+                            id: `cav${i}`, 
+                            name: `${i}` 
+                        }
+                    });
+                }
+                for(var i = 0; i<n; i++){
+                    for(var j = 0 ;j<n;j++){
+                        if(j!=i){
+                            data.push({
+                                group: 'edges',
+                                data: { 
+                                    id: `cav${i}to${j}`, 
+                                    source: `cav${i}`, target: `cav${j}`
+                                }
+                            });
+                        }
+                    }
+                }
+                this.cy.add(data);
+                var layout = this.cy.elements().layout({
+                    name: 'concentric',
+                    concentric: function(n){ return n.id() === 'j' ? 200 : 0; },
+                    levelWidth: function(nodes){ return 100; },
+                    minNodeSpacing: 100
+                });
+                layout.run();
+            },
+            setPopper : function(weiData){
+                for(var i = 0;i<basic._n;i++){
+                    for(var j=0;j<weiData[i].length;j++){
+                        if(j!=i){
+                            this.setOnePopper(i,j,weiData[i][j]);
+                        }
+                    }
+                }
+            },
+            setOnePopper : function(source,target,text){
+                var dom = this.cy.$(`#cav${source}to${target}`);
+                var popper = dom.popper({
+                    content: function(){ return graphics.makeDiv(text); }
+                });
+                var update = function(){
+                    popper.scheduleUpdate();
+                };
+                dom.connectedNodes().on('position', update);
+                this.cy.on('pan zoom resize', update);
+            },
+            makeDiv : function(text){
+                var div = document.createElement('div');
+                div.classList.add('popper-div');
+                div.innerHTML = text;
+                document.body.appendChild( div );
+                return div;
+            },
+            init : function(){
+                this.cy = window.cy = cytoscape({
+                    container: this.container,
+                    layout: {
+                        name: 'concentric',
+                        concentric: function(n){ return n.id() === 'j' ? 200 : 0; },
+                        levelWidth: function(nodes){ return 100; },
+                        minNodeSpacing: 100
+                    },
+                    style: [
+                        {
+                        selector: 'node[name]',
+                        style: {
+                            'content': 'data(name)'
+                        }
+                        },
+
+                        {
+                        selector: 'edge',
+                        style: {
+                            'curve-style': 'bezier',
+                            'target-arrow-shape': 'triangle'
+                        }
+                        },
+
+                        // some style for the extension
+
+                        {
+                        selector: '.eh-handle',
+                        style: {
+                            'background-color': 'red',
+                            'width': 12,
+                            'height': 12,
+                            'shape': 'ellipse',
+                            'overlay-opacity': 0,
+                            'border-width': 12, // makes the handle easier to hit
+                            'border-opacity': 0
+                        }
+                        },
+
+                        {
+                        selector: '.eh-hover',
+                        style: {
+                            'background-color': 'red'
+                        }
+                        },
+
+                        {
+                        selector: '.eh-source',
+                        style: {
+                            'border-width': 2,
+                            'border-color': 'red'
+                        }
+                        },
+
+                        {
+                        selector: '.eh-target',
+                        style: {
+                            'border-width': 2,
+                            'border-color': 'red'
+                        }
+                        },
+
+                        {
+                        selector: '.eh-preview, .eh-ghost-edge',
+                        style: {
+                            'background-color': 'red',
+                            'line-color': 'red',
+                            'target-arrow-color': 'red',
+                            'source-arrow-color': 'red'
+                        }
+                        },
+
+                        {
+                        selector: '.eh-ghost-edge.eh-preview-active',
+                        style: {
+                            'opacity': 0
+                        }
+                        }
+                    ],
+                });
+
+                var eh = this.cy.edgehandles({
+                    snap: true
+                });
+                    
+                eh.disableDrawMode();
+                eh.disable();
+            }
+        }
+        document.addEventListener('DOMContentLoaded', function(){
+            graphics.init();
+        });
+
+        var answer = {
+            setArea : $("#ansSetArea"),
+            ansArea : $("#ansArea"),
+            updateInfo : function(T,L,l){
+                this.setArea.html(`
+                    <p class="ml-3"> 初始溫度：${T}</p>
+                    <p class="ml-3"> 迭代次數：${L}</p>
+                    <p class="ml-3"> 降溫常數：${l}</p>
+                `);
+            },
+            getAns : function(){
+                data = {
+                    info : {
+                        N : basic._n,
+                        T : basic._T,
+                        L : basic._L,
+                        l : basic._l
+                    },
+                    map : weights.weiData
+                };
+                this.ajax('getAns.php',data)
+                .done(function(e){
+                    console.log(e);
+                    var html = "";
+                    if(e.status == 1){
+                        e.data.forEach(el => {
+                            html += `
+                                <div class="card mb-3">
+                                <div class="card-body">
+                                    <p>
+                                        <b>T：</b>
+                                        ${basic._T}
+                                        <b class="ml-2">L：</b>
+                                        ${basic._L}
+                                        <b class="ml-2">l：</b>
+                                        ${basic._l}
+                                    </p>
+                                    <p>
+                                        <b>解：</b>
+                                        ${el.ans}
+                                        <b class="ml-2">成本：</b>
+                                        ${el.cost}
+                                    </p>
+                                </div>
+                                </div>
+                            `;
+                        });
+                    }
+                    answer.ansArea.append(html);
+                });
+            },
+            ajax : function(postUrl,postData){
+                return $.ajax({
+                    url: postUrl,
+                    type: 'POST',
+                    dataType: 'json',
+                    data: {
+                        data : JSON.stringify(postData),
+                    }
+                }).fail(function(e) {
+                    alert('ajax 執行失敗');
+                });
+            }
+        };
+    </script>
+
+</html>
